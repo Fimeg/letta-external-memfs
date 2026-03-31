@@ -1,0 +1,74 @@
+diff --git a/src/agent/memoryGit.ts b/src/agent/memoryGit.ts
+index 123456..789abc 100644
+--- a/src/agent/memoryGit.ts
++++ b/src/agent/memoryGit.ts
+@@ -58,9 +58,19 @@ export function normalizeCredentialBaseUrl(serverUrl: string): string {
+ }
+
+ /** Git remote URL for the agent's state repo */
+-function getGitRemoteUrl(agentId: string): string {
+-  const baseUrl = getServerUrl().trim().replace(/\/+$/, "");
+-  return `${baseUrl}/v1/git/${agentId}/state.git`;
++/**
++ * Git remote URL for the agent's state repo.
++ *
++ * If LETTA_MEMFS_GIT_URL is set, uses it as a URL template (replaces
++ * `{agentId}` with the actual agent ID). This allows pointing directly
++ * at an external git host (e.g. Gitea) instead of proxying through the
++ * Letta server's memfs sidecar.
++ *
++ * Example: LETTA_MEMFS_GIT_URL=http://token@host:4455/Org/{agentId}.git
++ */
++function getGitRemoteUrl(agentId: string): string {
++  const envUrl = process.env.LETTA_MEMFS_GIT_URL;
++  if (envUrl) {
++    return envUrl.replace("{agentId}", agentId);
++  }
++  const baseUrl = getServerUrl().trim().replace(/\/+$/, "");
++  return `${baseUrl}/v1/git/${agentId}/state.git`;
+ }
+
+ /**
+@@ -128,9 +138,15 @@ async function runGit(
+ /**
+  * Configure a local credential helper in the repo's .git/config
+  * so plain `git push` / `git pull` work without auth prefixes.
++ *
++ * Skipped when LETTA_MEMFS_GIT_URL is set — external URLs (e.g. Gitea)
++ * typically embed auth in the URL or use their own credential flow.
+  */
+ async function configureLocalCredentialHelper(
+   dir: string,
+   token: string,
+ ): Promise<void> {
++  if (process.env.LETTA_MEMFS_GIT_URL) {
++    debugLog("memfs-git", "Skipping credential helper (LETTA_MEMFS_GIT_URL is set)");
++    return;
++  }
+   const rawBaseUrl = getServerUrl();
+   const normalizedBaseUrl = normalizeCredentialBaseUrl(rawBaseUrl);
+   const helper = `!f() { echo "username=letta"; echo "password=${token}"; }; f`;
+@@ -370,6 +386,20 @@ export async function cloneMemoryRepo(agentId: string): Promise<void> {
+     }
+   }
+
++  // Ensure origin remote points to the right URL (handles migration
++  // from sidecar to Gitea or other external git hosts).
++  if (existsSync(join(dir, ".git"))) {
++    const url = getGitRemoteUrl(agentId);
++    try {
++      const { stdout: currentUrl } = await runGit(dir, ["remote", "get-url", "origin"]);
++      if (currentUrl.trim() !== url) {
++        await runGit(dir, ["remote", "set-url", "origin", url]);
++        debugLog("memfs-git", `Updated origin remote to ${url}`);
++      }
++    } catch {
++      // No origin remote exists — add it
++      await runGit(dir, ["remote", "add", "origin", url]);
++      debugLog("memfs-git", `Added origin remote: ${url}`);
++    }
++  }
++
+   // Configure local credential helper so the agent can do plain
+   // `git push` / `git pull` without auth prefixes.
+   await configureLocalCredentialHelper(dir, token);

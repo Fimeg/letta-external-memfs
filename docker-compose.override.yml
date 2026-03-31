@@ -1,0 +1,14 @@
+# Letta External MemFS — Docker Compose Override
+#
+# Use local memfs backend (no sidecar required)
+#
+# Add to your docker-compose.yml or use as override:
+#   docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
+
+services:
+  letta-server:
+    environment:
+      # Use local filesystem backend for memfs operations.
+      # This eliminates the need for a sidecar proxy — letta-code
+      # connects directly to external git hosts via HTTPS/SSH.
+      - LETTA_MEMFS_SERVICE_URL=local

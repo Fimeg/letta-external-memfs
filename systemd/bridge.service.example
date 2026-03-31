@@ -1,0 +1,43 @@
+# Example systemd service for Letta bridge with external MemFS
+#
+# Copy to: ~/.config/systemd/user/ani-bridge.service
+# Then: systemctl --user daemon-reload && systemctl --user enable --now ani-bridge.service
+
+[Unit]
+Description=Letta Bridge (External MemFS)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/user
+ExecStart=/usr/bin/node /path/to/lettabot/dist/main.js --fresh
+Restart=always
+RestartSec=10
+
+# Node settings
+Environment=NODE_NO_WARNINGS=1
+
+# Letta server connection
+Environment=LETTA_BASE_URL=http://localhost:8283
+
+# Enable memfs locally (bypasses sidecar requirement)
+Environment=LETTA_MEMFS_LOCAL=1
+
+# External git host URL - REQUIRED
+# For HTTPS with embedded token:
+Environment=LETTA_MEMFS_GIT_URL=https://token@gitea.example.com/user/repo.git
+# For SSH (ensure key is in ssh-agent):
+# Environment=LETTA_MEMFS_GIT_URL=git@gitea.example.com:user/repo.git
+# For per-agent repos, use {agentId} placeholder:
+# Environment=LETTA_MEMFS_GIT_URL=https://token@gitea.example.com/agents/{agentId}.git
+
+# Bridge config (adjust paths to your setup)
+Environment=LETTABOT_CONFIG=/path/to/lettabot.yaml
+Environment=WORKING_DIR=/home/user
+Environment=API_HOST=0.0.0.0
+
+# Letta Code CLI path (patched version)
+Environment=LETTA_CLI_PATH=/path/to/letta-code/letta.js
+
+[Install]
+WantedBy=default.target
