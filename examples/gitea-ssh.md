@@ -69,7 +69,7 @@ git push -u origin daemon
 
 **"Could not resolve hostname":**
 - Verify SSH config HostName matches your network
-- For local testing, use IP address: `git@10.10.20.120:user/repo.git`
+- For local testing, use IP address: `git@192.168.1.100:user/repo.git`
 
 **Passphrase prompts:**
 The agent process runs non-interactively and can't enter passphrases. Either:

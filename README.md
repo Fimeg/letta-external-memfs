@@ -104,7 +104,7 @@ git checkout -b daemon  # or main, intrusive, etc.
 
 ### Gitea / GitLab / GitHub (token in URL)
 ```bash
-https://gitea_token@10.10.20.120:4455/Fimeg/ani-infrastructure.git
+https://token@gitea.example.com/username/repo.git
 ```
 
 ### With agentId placeholder (per-agent repos)
@@ -173,4 +173,4 @@ MIT — same as Letta Code.
 
 ## Credit
 
-Developed for Ani/Aster LettaBot deployment. Gitea migration eliminates the memfs sidecar entirely — one less Python process, centralized git storage, full web UI for memory management.
+Developed for self-hosted Letta deployments. External MemFS eliminates the need for a sidecar proxy — direct git connections, centralized storage, full web UI for memory management.

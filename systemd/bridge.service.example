@@ -1,7 +1,7 @@
 # Example systemd service for Letta bridge with external MemFS
 #
-# Copy to: ~/.config/systemd/user/ani-bridge.service
-# Then: systemctl --user daemon-reload && systemctl --user enable --now ani-bridge.service
+# Copy to: ~/.config/systemd/user/letta-bridge.service
+# Then: systemctl --user daemon-reload && systemctl --user enable --now letta-bridge.service
 
 [Unit]
 Description=Letta Bridge (External MemFS)
