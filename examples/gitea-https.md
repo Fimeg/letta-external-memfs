@@ -29,9 +29,18 @@ The `{agentId}` placeholder will be replaced with the actual agent ID at runtime
 cd ~/.letta/agents/{agentId}/memory
 git init
 git remote add origin https://your-token@gitea.example.com/username/repo.git
-git checkout -b daemon
+git checkout -b main
 # Create initial commit
 git add . && git commit -m "init"
+git push -u origin main
+```
+
+### Advanced: High-Frequency Writes (Optional)
+
+If you have agents writing frequently (e.g., every heartbeat), use a `daemon` branch pattern:
+
+```bash
+git checkout -b daemon
 git push -u origin daemon
 ```
 

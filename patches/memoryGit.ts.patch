@@ -1,5 +1,5 @@
 diff --git a/src/agent/memoryGit.ts b/src/agent/memoryGit.ts
-index 123456..789abc 100644
+index 2daeb32a..f8c4d2e1 100644
 --- a/src/agent/memoryGit.ts
 +++ b/src/agent/memoryGit.ts
 @@ -58,9 +58,19 @@ export function normalizeCredentialBaseUrl(serverUrl: string): string {

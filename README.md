@@ -2,6 +2,8 @@
 
 Connect Letta Code directly to external git hosts (Gitea, GitLab, GitHub, etc.) for memory persistence — no memfs sidecar required.
 
+> **Status:** Endorsed by Letta team as the recommended self-hosted memfs path. Community-maintained, not part of Letta support SLA.
+
 ## What This Does
 
 By default, Letta's git-backed memory (MemFS) requires either:
@@ -82,6 +84,16 @@ Or with `{agentId}` placeholder for per-agent repos:
 export LETTA_MEMFS_GIT_URL="https://token@gitea.example.com/agents/{agentId}.git"
 ```
 
+#### Local Instance Optimization
+
+If your Gitea instance is on the same network as your agent (e.g., internal IP like `10.10.20.120`), enable client-side short-circuit:
+
+```bash
+export LETTA_MEMFS_LOCAL=1
+```
+
+This avoids unnecessary network hops for local git operations.
+
 ### 5. Prepare Your Git Repo
 
 Create a repo on your git host, then initialize the memory directory:
@@ -90,7 +102,7 @@ Create a repo on your git host, then initialize the memory directory:
 cd ~/.letta/agents/{agentId}/memory
 git init
 git remote add origin https://token@gitea.example.com/user/repo.git
-git checkout -b daemon  # or main, intrusive, etc.
+git checkout -b main    # Use 'daemon' branch for high-frequency writes (see Advanced Patterns)
 ```
 
 ## Configuration Reference
@@ -118,6 +130,18 @@ git@gitea.example.com:user/repo.git
 ```
 
 For SSH, ensure your key is available to the agent process (e.g., ssh-agent, or key in `~/.ssh/` with proper permissions). The URL in `LETTA_MEMFS_GIT_URL` should use the SSH format, and the key must be passphrase-less or loaded in ssh-agent.
+
+### ⚠️ Security Note: Tokens in URLs
+
+When using `https://token@host/...` format, be aware that:
+- The token appears in `ps aux` output while git operations run
+- The URL with token may be stored in git config (`git remote get-url origin`)
+- Shell history may record the export command
+
+**Recommendations:**
+- Use `git config credential.helper store` to cache credentials separately
+- Or use SSH key auth (`git@host:user/repo.git`) instead of HTTPS tokens
+- For production, consider a git credential helper that reads from environment or vault
 
 ## Testing
 

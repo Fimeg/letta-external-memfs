@@ -55,8 +55,17 @@ export LETTA_MEMFS_GIT_URL="git@gitea-letta:username/repo.git"
 cd ~/.letta/agents/{agentId}/memory
 git init
 git remote add origin git@gitea.example.com:username/repo.git
-git checkout -b daemon
+git checkout -b main
 git add . && git commit -m "init"
+git push -u origin main
+```
+
+### Advanced: High-Frequency Writes (Optional)
+
+For agents writing frequently, use a `daemon` branch:
+
+```bash
+git checkout -b daemon
 git push -u origin daemon
 ```
 
