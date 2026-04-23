@@ -1,14 +1,35 @@
 # Letta External MemFS — Docker Compose Override
 #
-# Use local memfs backend (no sidecar required)
-#
-# Add to your docker-compose.yml or use as override:
+# Pairs with the server + client patches in patches/.
+# Apply on top of your base compose:
 #   docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
+#
+# Assumes your base compose uses the image name `letta-local` (or similar)
+# built from a patched letta-source checkout — see the main README's
+# "Rebuild Letta Server Image" step.
 
 services:
   letta-server:
     environment:
-      # Use local filesystem backend for memfs operations.
-      # This eliminates the need for a sidecar proxy — letta-code
-      # connects directly to external git hosts via HTTPS/SSH.
+      # Use the server's local filesystem as the memfs backing store.
+      # With the client-side patch, letta-code pushes go to your external
+      # git host instead of /v1/git/. The server still needs a memfs backing
+      # for GitEnabledBlockManager writes and for the sync-from-git endpoint
+      # to read from.
       - LETTA_MEMFS_SERVICE_URL=local
+
+    volumes:
+      # Persistence for the server's backing memfs.
+      # Without this, `docker compose down` wipes /root/.letta/memfs and
+      # session init fails on restart (postgres blocks survive, but the
+      # server's git repos are gone).
+      #
+      # Choose one:
+      #   (a) Named volume — simplest, survives container recreate:
+      - letta-memfs:/root/.letta/memfs
+      #
+      #   (b) Bind mount — easier to back up / snapshot from the host:
+      # - /var/lib/letta/memfs:/root/.letta/memfs
+
+volumes:
+  letta-memfs:

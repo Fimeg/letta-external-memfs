@@ -1,0 +1,70 @@
+diff --git a/letta/server/rest_api/routers/v1/agents.py b/letta/server/rest_api/routers/v1/agents.py
+index 1fdfdade..a51006e8 100644
+--- a/letta/server/rest_api/routers/v1/agents.py
++++ b/letta/server/rest_api/routers/v1/agents.py
+@@ -29,7 +29,7 @@ from letta.otel.context import get_ctx_attributes
+ from letta.otel.metric_registry import MetricRegistry
+ from letta.schemas.agent import AgentRelationships, AgentState, CreateAgent, UpdateAgent
+ from letta.schemas.agent_file import AgentFileSchema, SkillSchema
+-from letta.schemas.block import BlockResponse, BlockUpdate
++from letta.schemas.block import Block, BlockResponse, BlockUpdate
+ from letta.schemas.enums import AgentType, MessageRole, RunStatus
+ from letta.schemas.file import AgentFileAttachment, PaginatedAgentFiles
+ from letta.schemas.group import Group
+@@ -1323,6 +1323,56 @@ async def recompile_agent(
+     return system_message.to_openai_dict().get("content", "")
+ 
+ 
++@router.post(
++    "/{agent_id}/memory/sync-from-git",
++    response_model=List[Block],
++    operation_id="sync_memory_from_git",
++)
++async def sync_memory_from_git(
++    agent_id: AgentId,
++    server: "SyncServer" = Depends(get_letta_server),
++    headers: HeaderParams = Depends(get_headers),
++    recompile: bool = Query(
++        False,
++        description="If True, also rebuild the agent's system prompt after syncing.",
++    ),
++):
++    """Rebuild the PostgreSQL block cache from git (source of truth).
++
++    Exposes GitEnabledBlockManager.sync_blocks_from_git over HTTP so an
++    external sync process (e.g. a container that pulls from an external
++    git remote and wants the server to re-read the files into blocks)
++    can trigger the files -> blocks materialization that normally fires
++    on /v1/git/ receive.
++
++    Returns 409 if the server is not configured with GitEnabledBlockManager.
++    """
++    from letta.services.block_manager_git import GitEnabledBlockManager
++
++    actor = await server.user_manager.get_actor_or_default_async(actor_id=headers.actor_id)
++
++    if not isinstance(server.block_manager, GitEnabledBlockManager):
++        raise HTTPException(
++            status_code=status.HTTP_409_CONFLICT,
++            detail="Server is not configured with GitEnabledBlockManager; git-backed memory is unavailable.",
++        )
++
++    blocks = await server.block_manager.sync_blocks_from_git(
++        agent_id=agent_id,
++        actor=actor,
++    )
++
++    if recompile:
++        await server.agent_manager.rebuild_system_prompt_async(
++            agent_id=agent_id,
++            actor=actor,
++            force=True,
++            update_timestamp=False,
++        )
++
++    return blocks
++
++
+ @router.post(
+     "/{agent_id}/system-prompt/recompile",
+     response_model=str,

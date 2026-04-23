@@ -60,15 +60,6 @@ git add . && git commit -m "init"
 git push -u origin main
 ```
 
-### Advanced: High-Frequency Writes (Optional)
-
-For agents writing frequently, use a `daemon` branch:
-
-```bash
-git checkout -b daemon
-git push -u origin daemon
-```
-
 ## Troubleshooting
 
 **"Permission denied (publickey)":**

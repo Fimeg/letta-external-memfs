@@ -35,15 +35,6 @@ git add . && git commit -m "init"
 git push -u origin main
 ```
 
-### Advanced: High-Frequency Writes (Optional)
-
-If you have agents writing frequently (e.g., every heartbeat), use a `daemon` branch pattern:
-
-```bash
-git checkout -b daemon
-git push -u origin daemon
-```
-
 ## Troubleshooting
 
 **Self-signed certificates:**

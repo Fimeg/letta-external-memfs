@@ -17,7 +17,7 @@ index 2daeb32a..f8c4d2e1 100644
 + * at an external git host (e.g. Gitea) instead of proxying through the
 + * Letta server's memfs sidecar.
 + *
-+ * Example: LETTA_MEMFS_GIT_URL=http://token@host:4455/Org/{agentId}.git
++ * Example: LETTA_MEMFS_GIT_URL=https://token@host/Org/{agentId}.git
 + */
 +function getGitRemoteUrl(agentId: string): string {
 +  const envUrl = process.env.LETTA_MEMFS_GIT_URL;
