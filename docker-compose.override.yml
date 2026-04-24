@@ -24,6 +24,13 @@ services:
       # session init fails on restart (postgres blocks survive, but the
       # server's git repos are gone).
       #
+      # Each agent's bare repo lives under this mount at:
+      #   /root/.letta/memfs/repository/{org_id}/{agent_id}/repo.git/
+      # That is the path sync-from-git reads from and the path server-side
+      # `git --git-dir=...` fetches should target. Do not move the mount
+      # deeper — keep it at /root/.letta/memfs so Letta's storage backend
+      # and the sync flow both work.
+      #
       # Choose one:
       #   (a) Named volume — simplest, survives container recreate:
       - letta-memfs:/root/.letta/memfs

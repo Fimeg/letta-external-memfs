@@ -2,23 +2,38 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Documented server sync path was wrong.** The previous `docker exec cd /root/.letta/memfs/$AGENT_ID && git fetch && git reset --hard` pattern targeted a working-checkout path that does not exist on the server. Letta's `LocalStorageBackend` stores bare repo objects at `~/.letta/memfs/repository/{org_id}/{agent_id}/repo.git/`, and that is where `sync_blocks_from_git` reads from. Replaced with `git --git-dir=<bare-repo-path> fetch --force --update-head-ok <url> <branch>:<branch>`. Discovered by [@PurposeUnknown](https://github.com/PurposeUnknown) during multi-machine testing.
+- **`org_id` is part of the server storage path.** Default self-hosted install uses `org-00000000-0000-4000-8000-000000000000`. README now documents discovery (`docker exec ... ls .../repository | head -1`) and parameterizes `$ORG_ID` in every sync snippet.
+- **Step 7 divergent-history footgun.** `git checkout -b main` after `git remote add` collided with a populated remote and produced `fatal: refusing to merge unrelated histories` on first push. Now fetches first and conditionally creates tracking branch vs. fresh branch.
+- **Troubleshooting `refusing to merge unrelated histories`** rewritten to use `--git-dir` fetch with refspec (no merge involved) instead of `git reset --hard` in a non-existent working checkout.
+
 ### Added
-- **Server patch:** `patches/server_memory_sync_endpoint.patch` exposes `POST /v1/agents/{agent_id}/memory/sync-from-git`, wrapping Letta's existing `GitEnabledBlockManager.sync_blocks_from_git` over HTTP. Optional `?recompile=true` chains a system prompt rebuild. Tested against letta-server commit `a1333365` (0.16.7).
+- **Server patch:** `patches/server_sync_delete_propagation.patch` — opt-in. Extends `GitEnabledBlockManager.sync_blocks_from_git` to remove postgres blocks whose source files no longer exist in git. Uses the already-existing `get_blocks_by_agent_async` and `_delete_block_from_postgres` helpers. Makes git actually behave as the source of truth: file deletions/renames now propagate to the postgres cache instead of leaving orphan blocks.
+- **Server patch:** `patches/server_system_only_blocks.patch` — opt-in. Adds `LETTA_MEMFS_BLOCK_PATH_PREFIXES` env var to `letta/services/memory_repo/path_mapping.py`. When set (comma-separated list of prefixes, e.g. `system/`), only matching paths map to block labels; other `.md` files in the repo remain filesystem-only content. Unset / empty = upstream behavior unchanged. `skills/**/SKILL.md` always allowed through.
+- Configuration Reference entry for `LETTA_MEMFS_BLOCK_PATH_PREFIXES`.
+- `patches/README.md` now documents all three server patches with apply-order snippet and a note that they are independent (apply any subset).
+- **Server patch:** `patches/server_memory_sync_endpoint.patch` exposes `POST /v1/agents/{agent_id}/memory/sync-from-git`, wrapping Letta's existing `GitEnabledBlockManager.sync_blocks_from_git` over HTTP. Optional `?recompile=true` chains a system prompt rebuild. Tested against letta-server 0.16.7.
 - `patches/README.md` — documents both patches, their purpose, apply order, and tested versions.
-- README section **Server-Side Sync** with a minimal sync pattern and a diff-gated recompile pattern.
+- README section **Where the server actually stores memfs** explaining the bare-repo path and why fetches must target it with `--git-dir`.
+- README **Known upstream Letta behaviors** table now marks additive-only sync and all-`.md`-mapping as "fixed by opt-in patch in this repo"; UTF-8 binary decode remains documented as a workaround (repo is intended to be markdown-only).
+- README troubleshooting entries for additive-only sync, UTF-8 crash on binary files, and unexpected block creation for non-`system/` `.md` files.
+- README **Acknowledgements** section crediting [@PurposeUnknown](https://github.com/PurposeUnknown) for the architectural finding that corrected the sync path.
 - README section **Enabling MemFS for Your Agent** covering `/memfs enable` and the `git-memory-enabled` tag.
 - README architecture note aligning the patch's model with Letta's own "git is source of truth, postgres is cache" framing (`letta/services/block_manager_git.py`).
 - `docker-compose.override.yml`: named volume on `/root/.letta/memfs` so server state survives `docker compose down`.
 - Troubleshooting entries for stale `<projection>` paths, `refusing to merge unrelated histories`, and "Memfs not enabled" on session init.
+- Status row: tested with persistence volume (named volume / bind mount) and multi-machine sync (add/remove file on machine A → sync-from-git on machine B reflects change).
 
 ### Changed
+- Single-machine deployments note is now surfaced at the top of the Server-Side Sync section — most self-hosted users only need step 2 (the sync endpoint), not the pull step.
 - Installation is now 8 steps covering both client and server patches (was 5, client-only).
 - Configuration Reference adds `LETTA_MEMFS_LOCAL` and the new API route.
 
 ### Removed
 - `daemon` branch pattern from all examples and docs — `main` is now the sole documented branch
 
-### Fixed
+### Fixed (prior pass)
 - README testing section pushed to `daemon`; now pushes to `main` consistent with setup
 - Patch docstring example used plaintext `http://`; now `https://` in line with security guidance
 - CHANGELOG 1.0.0 entry mentioned "E2EE architecture with session persistence" — stray content from unrelated work, removed

@@ -1,0 +1,29 @@
+diff --git a/letta/services/block_manager_git.py b/letta/services/block_manager_git.py
+index d7a7049a3..18aa2d87f 100644
+--- a/letta/services/block_manager_git.py
++++ b/letta/services/block_manager_git.py
+@@ -592,5 +592,24 @@ class GitEnabledBlockManager(BlockManager):
+             )
+             synced_blocks.append(synced)
+ 
++        # Delete postgres blocks whose source files no longer exist in git.
++        # Stock sync_blocks_from_git is additive-only (upsert loop above),
++        # which leaves orphan blocks after file deletions/renames. Treating
++        # git as the source of truth means the postgres cache must shrink
++        # as well as grow.
++        git_labels = {b.label for b in git_blocks}
++        current_postgres = await self.get_blocks_by_agent_async(
++            agent_id=agent_id,
++            actor=actor,
++        )
++        orphan_labels = [b.label for b in current_postgres if b.label not in git_labels]
++        for label in orphan_labels:
++            await self._delete_block_from_postgres(
++                agent_id=agent_id,
++                label=label,
++                actor=actor,
++            )
++            logger.info(f"Deleted orphan block '{label}' for agent {agent_id} (no corresponding git file)")
++
+         logger.info(f"Synced {len(synced_blocks)} blocks from git for agent {agent_id}")
+         return synced_blocks

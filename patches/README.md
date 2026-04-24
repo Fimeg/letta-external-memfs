@@ -1,6 +1,16 @@
 # Patches
 
-Two patches — one client, one server. Both are required for the external-memfs setup to fully work.
+Four patches — one client, three server. The client patch + the sync-from-git endpoint are required; the other two server patches are opt-in hardening for known upstream behaviors that hurt multi-machine users.
+
+**Apply order on a fresh `letta-source` checkout:**
+
+```bash
+patch -p1 < patches/server_memory_sync_endpoint.patch       # required
+patch -p1 < patches/server_sync_delete_propagation.patch    # opt-in
+patch -p1 < patches/server_system_only_blocks.patch         # opt-in
+```
+
+All three server patches modify different files (or different regions of `block_manager_git.py`) and are independent of each other — you can apply any subset.
 
 ## `memoryGit.ts.patch` — client side (letta-code)
 
@@ -48,6 +58,40 @@ cd /path/to/letta-source    # your letta-server checkout
 patch -p1 < /path/to/letta-external-memfs/patches/server_memory_sync_endpoint.patch
 # then rebuild your docker image per your build flow
 ```
+
+## `server_sync_delete_propagation.patch` — opt-in hardening
+
+Extends `GitEnabledBlockManager.sync_blocks_from_git` to also remove orphan postgres blocks — i.e., blocks whose source files no longer exist in the agent's git repo. Stock `sync_blocks_from_git` is additive-only: it upserts one block per file in git but never scans postgres for blocks to delete. After a file delete or rename in git, the old block label sticks around until manually removed via the API.
+
+With this patch, after the existing upsert loop, the sync computes `{postgres labels} − {git labels}` and calls the existing `_delete_block_from_postgres` helper for each orphan. No new helpers, no new dependencies. `get_blocks_by_agent_async` and `_delete_block_from_postgres` already exist in 0.16.7.
+
+Scope: ~15 lines added inside `sync_blocks_from_git`. No effect on agents that aren't using `GitEnabledBlockManager`.
+
+### Applying
+
+```bash
+cd /path/to/letta-source
+patch -p1 < /path/to/letta-external-memfs/patches/server_sync_delete_propagation.patch
+```
+
+## `server_system_only_blocks.patch` — opt-in filter
+
+Adds an env-gated path-prefix filter to `letta/services/memory_repo/path_mapping.py`. Upstream maps every `.md` file under an agent's memfs repo to a postgres block label (with `skills/**/SKILL.md` specially handled). If you want to use the memfs repo as backup storage without promoting every `.md` file to a block, set:
+
+```
+LETTA_MEMFS_BLOCK_PATH_PREFIXES=system/
+```
+
+Only paths starting with one of the configured prefixes (comma-separated, e.g. `system/,users/`) produce a block label. `skills/**/SKILL.md` is always allowed through so existing skill behavior is preserved regardless of the filter. Unset / empty env var = upstream behavior unchanged.
+
+### Applying
+
+```bash
+cd /path/to/letta-source
+patch -p1 < /path/to/letta-external-memfs/patches/server_system_only_blocks.patch
+```
+
+Then set `LETTA_MEMFS_BLOCK_PATH_PREFIXES` in your compose or shell env to opt in.
 
 ## Tested Against
 
