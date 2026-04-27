@@ -93,6 +93,51 @@ patch -p1 < /path/to/letta-external-memfs/patches/server_system_only_blocks.patc
 
 Then set `LETTA_MEMFS_BLOCK_PATH_PREFIXES` in your compose or shell env to opt in.
 
+## `server_fix_shared_block_deletion.patch` — critical bug fix
+
+Fixes a bug in `letta/services/block_manager_git.py::_delete_block_from_postgres` where deleting a block from one agent would also delete it from all other agents sharing that block.
+
+**The bug:** Line 178 in the original code deletes from `BlocksAgents` without scoping to `agent_id`:
+```python
+await session.execute(delete(BlocksAgents).where(BlocksAgents.block_id == block.id))
+```
+
+This strips the block from **every attached agent**, not just the one being deleted. In multi-agent setups with shared blocks (e.g., 12-way or 15-way attachments), syncing one agent silently removes the block from all readers.
+
+**The fix:** Scope the delete to the specific agent, then only hard-delete the block if it's globally orphaned:
+```python
+# Detach this agent only
+await session.execute(
+    delete(BlocksAgents).where(
+        BlocksAgents.agent_id == agent_id,
+        BlocksAgents.block_id == block.id,
+    )
+)
+await session.flush()
+
+# Only hard-delete if globally orphaned
+remaining = await session.execute(
+    select(func.count()).select_from(BlocksAgents).where(BlocksAgents.block_id == block.id)
+)
+if remaining.scalar() == 0:
+    await block.hard_delete_async(db_session=session, actor=actor)
+```
+
+### Impact
+
+- **Single-agent setups**: No change in behavior
+- **Multi-agent setups with shared blocks**: Blocks remain intact across all agents
+- **Fixes a latent bug in upstream Letta**: The same bug exists in `delete_block_async` (line 348) when users explicitly delete blocks on memfs+shared-blocks setups
+
+### Applying
+
+```bash
+cd /path/to/letta-source
+patch -p1 < /path/to/letta-external-memfs/patches/server_fix_shared_block_deletion.patch
+```
+
+**Note**: This patch should be applied **after** `server_sync_delete_propagation.patch` if you're using both, as the delete propagation patch calls `_delete_block_from_postgres`.
+
 ## Tested Against
 
 | Component | Version |

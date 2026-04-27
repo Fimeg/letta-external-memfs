@@ -1,0 +1,35 @@
+diff --git a/letta/services/block_manager_git.py b/letta/services/block_manager_git.py
+index d7a7049a3..a1b2c1234 100644
+--- a/letta/services/block_manager_git.py
++++ b/letta/services/block_manager_git.py
+@@ -159,6 +159,7 @@ class GitEnabledBlockManager(BlockManager):
+             from letta.orm.blocks_agents import BlocksAgents
+
+             # Find block for this agent+label
++            from sqlalchemy import func
+             result = await session.execute(
+                 select(BlockModel)
+                 .join(BlocksAgents, BlocksAgents.block_id == BlockModel.id)
+@@ -170,10 +171,19 @@ class GitEnabledBlockManager(BlockManager):
+             block = result.scalar_one_or_none()
+
+             if block:
+-                # Delete from blocks_agents
+-                await session.execute(delete(BlocksAgents).where(BlocksAgents.block_id == block.id))
+-                # Delete the block
+-                await block.hard_delete_async(db_session=session, actor=actor)
++                # Detach this agent only - scope the delete to agent_id
++                await session.execute(
++                    delete(BlocksAgents).where(
++                        BlocksAgents.agent_id == agent_id,
++                        BlocksAgents.block_id == block.id,
++                    )
++                )
++                await session.flush()
++
++                # Only hard-delete if globally orphaned
++                remaining = await session.execute(
++                    select(func.count()).select_from(BlocksAgents).where(BlocksAgents.block_id == block.id)
++                )
++                if remaining.scalar() == 0:
++                    await block.hard_delete_async(db_session=session, actor=actor)

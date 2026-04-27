@@ -68,13 +68,17 @@ patch -p1 < /path/to/letta-external-memfs/patches/server_memory_sync_endpoint.pa
 # Opt-in hardening (recommended for multi-machine users)
 patch -p1 < /path/to/letta-external-memfs/patches/server_sync_delete_propagation.patch
 patch -p1 < /path/to/letta-external-memfs/patches/server_system_only_blocks.patch
+
+# Critical fix for multi-agent setups with shared blocks
+patch -p1 < /path/to/letta-external-memfs/patches/server_fix_shared_block_deletion.patch
 ```
 
 - `server_memory_sync_endpoint.patch` — adds `POST /v1/agents/{agent_id}/memory/sync-from-git`.
 - `server_sync_delete_propagation.patch` — makes `sync_blocks_from_git` also remove postgres blocks whose files were deleted in git (otherwise orphan blocks accumulate forever).
 - `server_system_only_blocks.patch` — gates path → block mapping behind `LETTA_MEMFS_BLOCK_PATH_PREFIXES` so you can restrict blocks to `system/` (or any prefix set) and use the rest of the repo as filesystem-only backup.
+- `server_fix_shared_block_deletion.patch` — **critical**: fixes a bug where deleting a block from one agent would delete it from all agents sharing that block. Required for multi-agent setups.
 
-The last two are independent and opt-in. See [`patches/README.md`](patches/README.md) for details.
+The last three are independent and opt-in. See [`patches/README.md`](patches/README.md) for details.
 
 ### 4. Rebuild Letta Server Image
 
